@@ -2,8 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.database import get_db
-from app.schemas.user import UserCreate, UserLogin, Token, UserResponse, PasswordReset, PasswordResetConfirm, PasswordChange
-from app.models.user import User
+# from app.schemas.user import UserCreate, UserLogin, Token, UserResponse, PasswordReset, PasswordResetConfirm, PasswordChange
+from app.schemas.user import (
+    UserCreate, UserLogin, Token, UserResponse, PasswordReset, 
+    PasswordResetConfirm, PasswordChange, UserRoleInfo, UserRolesResponse
+)
+from app.models.user import User, UserRole
 from app.utils.security import (
     verify_password, get_password_hash, create_access_token,
     generate_verification_token, generate_reset_token
@@ -14,9 +18,23 @@ from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/register", response_model=dict)
-async def register(user: UserCreate, db: Session = Depends(get_db)):
-    # Check if user already exists
+@router.get("/user-roles", response_model=UserRolesResponse)
+async def get_user_roles():
+    """Get available user roles for dropdown"""
+    roles = [
+        UserRoleInfo(value="admin", label="Administrator"),
+        UserRoleInfo(value="user", label="User"),
+        UserRoleInfo(value="editor", label="Editor")
+    ]
+    return UserRolesResponse(roles=roles)
+
+@router.post("/register/{role}", response_model=dict)
+async def register(
+    role: UserRole,  
+    user: UserCreate, 
+    db: Session = Depends(get_db)
+):
+    # Check if email exists
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(
@@ -26,24 +44,26 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     
     # Create verification token
     verification_token = generate_verification_token()
-    
+
     # Create user
     db_user = User(
         email=user.email,
         hashed_password=get_password_hash(user.password),
         full_name=user.full_name,
-        role=user.role,
+        role=role,  # 👈 comes from path dropdown
         verification_token=verification_token
     )
-    
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+
     # Send verification email
     await send_verification_email(user.email, verification_token)
-    
-    return {"message": "User registered successfully. Please check your email to verify your account."}
+
+    return {
+        "message": "User registered successfully. Please check your email to verify your account.",
+        "user_role": role.value
+    }
 
 @router.get("/verify-email")
 async def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
