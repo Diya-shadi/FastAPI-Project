@@ -82,11 +82,6 @@ class PasswordChange(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
 
-class BulkUserAction(BaseModel):
-    """For bulk operations"""
-    user_ids: List[int]
-    action: str  # "activate", "deactivate", "delete", "verify"
-
 class UserSearchFilter(BaseModel):
     """Search and filter parameters"""
     search: Optional[str] = None

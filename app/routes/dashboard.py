@@ -5,7 +5,7 @@ from app.database import get_db
 from app.schemas.user import (
     UserCreate, UserResponse, UserListResponse, UserUpdate, 
     UserUpdateByAdmin, UserDetailResponse, UserStatsResponse,
-    BulkUserAction, UserSearchFilter, UserRolesResponse, UserRoleInfo
+    UserSearchFilter, UserRolesResponse, UserRoleInfo
 )
 from app.models.user import User, UserRole
 from app.services.user_service import UserService
@@ -311,30 +311,6 @@ async def verify_user_manually_in_dashboard(
     """Manually verify user account from dashboard (Admin only)"""
     return UserService.verify_user(db, user_id)
 
-@router.post("/users/bulk-action")
-async def bulk_user_actions_in_dashboard(
-    bulk_action: BulkUserAction,
-    current_user: User = Depends(get_admin_user),
-    db: Session = Depends(get_db)
-):
-    """Perform bulk actions on multiple users from dashboard (Admin only)"""
-    
-    # Prevent admin from performing bulk actions on themselves
-    if current_user.id in bulk_action.user_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot perform bulk actions on your own account"
-        )
-    
-    valid_actions = ["activate", "deactivate", "delete", "verify"]
-    if bulk_action.action not in valid_actions:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid action. Must be one of: {', '.join(valid_actions)}"
-        )
-    
-    result = UserService.bulk_user_action(db, bulk_action.user_ids, bulk_action.action)
-    return result
 
 # ==================== DASHBOARD ANALYTICS & REPORTS ====================
 
